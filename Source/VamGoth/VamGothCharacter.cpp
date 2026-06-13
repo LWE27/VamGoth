@@ -1,175 +1,154 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
 #include "VamGothCharacter.h"
-#include "Engine/LocalPlayer.h"
+
 #include "Camera/CameraComponent.h"
 #include "Components/CapsuleComponent.h"
+#include "EnhancedInputComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/SpringArmComponent.h"
-#include "GameFramework/Controller.h"
-#include "EnhancedInputComponent.h"
-#include "EnhancedInputSubsystems.h"
 #include "InputActionValue.h"
 #include "VamGoth.h"
 
 AVamGothCharacter::AVamGothCharacter()
 {
-	// Set size for collision capsule
-	GetCapsuleComponent()->InitCapsuleSize(42.f, 96.0f);
+	GetCapsuleComponent()->InitCapsuleSize(42.f, 96.f);
 
-	// Don't rotate when the controller rotates. Let that just affect the camera.
 	bUseControllerRotationPitch = false;
 	bUseControllerRotationYaw = false;
 	bUseControllerRotationRoll = false;
 
-	// Configure character movement
-	GetCharacterMovement()->bOrientRotationToMovement = true;
-	GetCharacterMovement()->RotationRate = FRotator(0.0f, 500.0f, 0.0f);
+	UCharacterMovementComponent* Movement = GetCharacterMovement();
+	Movement->bOrientRotationToMovement = true;
+	Movement->RotationRate = FRotator(0.f, 500.f, 0.f);
+	Movement->JumpZVelocity = 500.f;
+	Movement->AirControl = 0.35f;
+	Movement->MaxWalkSpeed = 500.f;
+	Movement->MinAnalogWalkSpeed = 20.f;
+	Movement->BrakingDecelerationWalking = 2000.f;
+	Movement->BrakingDecelerationFalling = 1500.f;
 
-	// Note: For faster iteration times these variables, and many more, can be tweaked in the Character Blueprint
-	// instead of recompiling to adjust them
-	GetCharacterMovement()->JumpZVelocity = 500.f;
-	GetCharacterMovement()->AirControl = 0.35f;
-	GetCharacterMovement()->MaxWalkSpeed = 500.f;
-	GetCharacterMovement()->MinAnalogWalkSpeed = 20.f;
-	GetCharacterMovement()->BrakingDecelerationWalking = 2000.f;
-	GetCharacterMovement()->BrakingDecelerationFalling = 1500.0f;
-
-	// Create a camera boom (pulls in towards the player if there is a collision)
 	CameraBoom = CreateDefaultSubobject<USpringArmComponent>(TEXT("CameraBoom"));
 	CameraBoom->SetupAttachment(RootComponent);
-	CameraBoom->TargetArmLength = 400.0f;
+	CameraBoom->TargetArmLength = 400.f;
 	CameraBoom->bUsePawnControlRotation = true;
 
-	// Create a follow camera
 	FollowCamera = CreateDefaultSubobject<UCameraComponent>(TEXT("FollowCamera"));
 	FollowCamera->SetupAttachment(CameraBoom, USpringArmComponent::SocketName);
 	FollowCamera->bUsePawnControlRotation = false;
-
-	// Note: The skeletal mesh and anim blueprint references on the Mesh component (inherited from Character) 
-	// are set in the derived blueprint asset named ThirdPersonCharacter (to avoid direct content references in C++)
 }
 
 void AVamGothCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
 {
-	// Set up action bindings
-	if (UEnhancedInputComponent* EnhancedInputComponent = Cast<UEnhancedInputComponent>(PlayerInputComponent))
+	UEnhancedInputComponent* EnhancedInputComponent = Cast<UEnhancedInputComponent>(PlayerInputComponent);
+
+	if (!EnhancedInputComponent)
 	{
-		// Jumping
-		EnhancedInputComponent->BindAction(JumpAction, ETriggerEvent::Started, this, &ACharacter::Jump);
-		EnhancedInputComponent->BindAction(JumpAction, ETriggerEvent::Completed, this, &ACharacter::StopJumping);
-
-		// Moving
-		EnhancedInputComponent->BindAction(MoveAction, ETriggerEvent::Triggered, this, &AVamGothCharacter::Move);
-		EnhancedInputComponent->BindAction(MouseLookAction, ETriggerEvent::Triggered, this, &AVamGothCharacter::Look);
-
-		// Looking
-		EnhancedInputComponent->BindAction(LookAction, ETriggerEvent::Triggered, this, &AVamGothCharacter::Look);
-
-		// Attack Input Action
-		EnhancedInputComponent->BindAction(AttackInputAction, ETriggerEvent::Started, this,
-		                                   &AVamGothCharacter::DoAttack);
+		UE_LOG(LogVamGoth, Error, TEXT("%s has no Enhanced Input Component."), *GetNameSafe(this));
+		return;
 	}
-	else
-	{
-		UE_LOG(LogVamGoth, Error,
-		       TEXT(
-			       "'%s' Failed to find an Enhanced Input component! This template is built to use the Enhanced Input system. If you intend to use the legacy system, then you will need to update this C++ file."
-		       ), *GetNameSafe(this));
-	}
+
+	EnhancedInputComponent->BindAction(JumpAction, ETriggerEvent::Started, this, &ACharacter::Jump);
+	EnhancedInputComponent->BindAction(JumpAction, ETriggerEvent::Completed, this, &ACharacter::StopJumping);
+
+	EnhancedInputComponent->BindAction(MoveAction, ETriggerEvent::Triggered, this, &AVamGothCharacter::Move);
+	EnhancedInputComponent->BindAction(LookAction, ETriggerEvent::Triggered, this, &AVamGothCharacter::Look);
+	EnhancedInputComponent->BindAction(MouseLookAction, ETriggerEvent::Triggered, this, &AVamGothCharacter::Look);
+
+	EnhancedInputComponent->BindAction(AttackInputAction, ETriggerEvent::Started, this, &AVamGothCharacter::DoAttack);
 }
 
 void AVamGothCharacter::Move(const FInputActionValue& Value)
 {
-	// input is a Vector2D
-	FVector2D MovementVector = Value.Get<FVector2D>();
-
-	// route the input
+	const FVector2D MovementVector = Value.Get<FVector2D>();
 	DoMove(MovementVector.X, MovementVector.Y);
 }
 
 void AVamGothCharacter::Look(const FInputActionValue& Value)
 {
-	// input is a Vector2D
-	FVector2D LookAxisVector = Value.Get<FVector2D>();
-
-	// route the input
-	DoLook(LookAxisVector.X, LookAxisVector.Y);
+	const FVector2D LookVector = Value.Get<FVector2D>();
+	DoLook(LookVector.X, LookVector.Y);
 }
 
 void AVamGothCharacter::DoMove(float Right, float Forward)
 {
-	if (GetController() != nullptr)
+	AController* OwningController = GetController();
+
+	if (!OwningController)
 	{
-		// find out which way is forward
-		const FRotator Rotation = GetController()->GetControlRotation();
-		const FRotator YawRotation(0, Rotation.Yaw, 0);
-
-		// get forward vector
-		const FVector ForwardDirection = FRotationMatrix(YawRotation).GetUnitAxis(EAxis::X);
-
-		// get right vector 
-		const FVector RightDirection = FRotationMatrix(YawRotation).GetUnitAxis(EAxis::Y);
-
-		// add movement 
-		AddMovementInput(ForwardDirection, Forward);
-		AddMovementInput(RightDirection, Right);
+		return;
 	}
+
+	const FRotator ControlRotation = OwningController->GetControlRotation();
+	const FRotator YawRotation(0.f, ControlRotation.Yaw, 0.f);
+
+	const FVector ForwardDirection = FRotationMatrix(YawRotation).GetUnitAxis(EAxis::X);
+	const FVector RightDirection = FRotationMatrix(YawRotation).GetUnitAxis(EAxis::Y);
+
+	AddMovementInput(ForwardDirection, Forward);
+	AddMovementInput(RightDirection, Right);
 }
 
 void AVamGothCharacter::DoLook(float Yaw, float Pitch)
 {
-	if (GetController() != nullptr)
+	if (!GetController())
 	{
-		// add yaw and pitch input to controller
-		AddControllerYawInput(Yaw);
-		AddControllerPitchInput(Pitch);
+		return;
 	}
-}
 
-void AVamGothCharacter::DoJumpStart()
-{
-	// signal the character to jump
-	Jump();
-}
-
-void AVamGothCharacter::DoJumpEnd()
-{
-	// signal the character to stop jumping
-	StopJumping();
+	AddControllerYawInput(Yaw);
+	AddControllerPitchInput(Pitch);
 }
 
 void AVamGothCharacter::DoAttack()
 {
-	UE_LOG(LogTemp, Display, TEXT("Do Attack, Attack Count: %d"), AttackCount);
-
-	IsAttacking = true;
-
-	if (IsAttacking && CanAttack)
+	if (!CanAttack)
 	{
-		SaveAttack = true;
-
-		switch (AttackCount)
-		{
-		case 0:
-			AttackCount = 1;
-			PlayAnimMontage(AttackComboOne, 1.f, NAME_None);
-			break;
-		case 1:
-			AttackCount = 2;
-			PlayAnimMontage(AttackComboTwo, 1.f, NAME_None);
-			break;
-		case 2:
-			AttackCount = 3;
-			PlayAnimMontage(AttackComboThree, 1.f, NAME_None);
-			ResetCombo();
-			break;
-		}
-		GetWorldTimerManager().SetTimer(AttackIntervalTimerHandle, this, &AVamGothCharacter::ResetAttackInterval,
-		                                AttackInterval, false);
+		return;
 	}
 
 	CanAttack = false;
+	IsAttacking = true;
+	SaveAttack = true;
+
+	UE_LOG(LogTemp, Display, TEXT("Do Attack, Attack Count: %d"), AttackCount);
+
+	UAnimMontage* MontageToPlay = nullptr;
+
+	switch (AttackCount)
+	{
+	case 0:
+		MontageToPlay = AttackComboOne;
+		AttackCount = 1;
+		break;
+
+	case 1:
+		MontageToPlay = AttackComboTwo;
+		AttackCount = 2;
+		break;
+
+	case 2:
+		MontageToPlay = AttackComboThree;
+		ResetCombo();
+		break;
+
+	default:
+		ResetCombo();
+		break;
+	}
+
+	if (MontageToPlay)
+	{
+		PlayAnimMontage(MontageToPlay);
+	}
+
+	GetWorldTimerManager().SetTimer(
+		AttackIntervalTimerHandle,
+		this,
+		&AVamGothCharacter::ResetAttackInterval,
+		AttackInterval,
+		false
+	);
 }
 
 void AVamGothCharacter::ResetCombo()
@@ -181,6 +160,6 @@ void AVamGothCharacter::ResetCombo()
 
 void AVamGothCharacter::ResetAttackInterval()
 {
-	UE_LOG(LogTemp, Display, TEXT("Attack reset"));
 	CanAttack = true;
+	UE_LOG(LogTemp, Display, TEXT("Attack reset"));
 }
