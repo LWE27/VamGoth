@@ -16,7 +16,7 @@ AVamGothCharacter::AVamGothCharacter()
 {
 	// Set size for collision capsule
 	GetCapsuleComponent()->InitCapsuleSize(42.f, 96.0f);
-		
+
 	// Don't rotate when the controller rotates. Let that just affect the camera.
 	bUseControllerRotationPitch = false;
 	bUseControllerRotationYaw = false;
@@ -53,8 +53,8 @@ AVamGothCharacter::AVamGothCharacter()
 void AVamGothCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
 {
 	// Set up action bindings
-	if (UEnhancedInputComponent* EnhancedInputComponent = Cast<UEnhancedInputComponent>(PlayerInputComponent)) {
-		
+	if (UEnhancedInputComponent* EnhancedInputComponent = Cast<UEnhancedInputComponent>(PlayerInputComponent))
+	{
 		// Jumping
 		EnhancedInputComponent->BindAction(JumpAction, ETriggerEvent::Started, this, &ACharacter::Jump);
 		EnhancedInputComponent->BindAction(JumpAction, ETriggerEvent::Completed, this, &ACharacter::StopJumping);
@@ -65,10 +65,17 @@ void AVamGothCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCo
 
 		// Looking
 		EnhancedInputComponent->BindAction(LookAction, ETriggerEvent::Triggered, this, &AVamGothCharacter::Look);
+
+		// Attack Input Action
+		EnhancedInputComponent->BindAction(AttackInputAction, ETriggerEvent::Started, this,
+		                                   &AVamGothCharacter::DoAttack);
 	}
 	else
 	{
-		UE_LOG(LogVamGoth, Error, TEXT("'%s' Failed to find an Enhanced Input component! This template is built to use the Enhanced Input system. If you intend to use the legacy system, then you will need to update this C++ file."), *GetNameSafe(this));
+		UE_LOG(LogVamGoth, Error,
+		       TEXT(
+			       "'%s' Failed to find an Enhanced Input component! This template is built to use the Enhanced Input system. If you intend to use the legacy system, then you will need to update this C++ file."
+		       ), *GetNameSafe(this));
 	}
 }
 
@@ -130,4 +137,50 @@ void AVamGothCharacter::DoJumpEnd()
 {
 	// signal the character to stop jumping
 	StopJumping();
+}
+
+void AVamGothCharacter::DoAttack()
+{
+	UE_LOG(LogTemp, Display, TEXT("Do Attack, Attack Count: %d"), AttackCount);
+
+	IsAttacking = true;
+
+	if (IsAttacking && CanAttack)
+	{
+		SaveAttack = true;
+
+		switch (AttackCount)
+		{
+		case 0:
+			AttackCount = 1;
+			PlayAnimMontage(AttackComboOne, 1.f, NAME_None);
+			break;
+		case 1:
+			AttackCount = 2;
+			PlayAnimMontage(AttackComboTwo, 1.f, NAME_None);
+			break;
+		case 2:
+			AttackCount = 3;
+			PlayAnimMontage(AttackComboThree, 1.f, NAME_None);
+			ResetCombo();
+			break;
+		}
+		GetWorldTimerManager().SetTimer(AttackIntervalTimerHandle, this, &AVamGothCharacter::ResetAttackInterval,
+		                                AttackInterval, false);
+	}
+
+	CanAttack = false;
+}
+
+void AVamGothCharacter::ResetCombo()
+{
+	IsAttacking = false;
+	SaveAttack = false;
+	AttackCount = 0;
+}
+
+void AVamGothCharacter::ResetAttackInterval()
+{
+	UE_LOG(LogTemp, Display, TEXT("Attack reset"));
+	CanAttack = true;
 }
