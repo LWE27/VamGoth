@@ -9,6 +9,7 @@
 #include "GameFramework/SpringArmComponent.h"
 #include "InputActionValue.h"
 #include "VamGoth.h"
+#include "Kismet/GameplayStatics.h"
 
 AVamGothCharacter::AVamGothCharacter()
 {
@@ -140,6 +141,7 @@ void AVamGothCharacter::DoAttack()
 	if (MontageToPlay)
 	{
 		PlayAnimMontage(MontageToPlay);
+		PlayComboSound();
 	}
 
 	GetWorldTimerManager().SetTimer(
@@ -162,4 +164,22 @@ void AVamGothCharacter::ResetAttackInterval()
 {
 	CanAttack = true;
 	UE_LOG(LogTemp, Display, TEXT("Attack reset"));
+}
+
+void AVamGothCharacter::PlayComboSound()
+{
+	switch (AttackCount)
+	{
+	case 0:
+		UGameplayStatics::PlaySoundAtLocation(GetWorld(), ComboOneSound, this->GetActorLocation());
+		break;
+	case 1:
+		UGameplayStatics::PlaySoundAtLocation(GetWorld(), ComboTwoSound, this->GetActorLocation());
+		break;
+	case 2:
+		UGameplayStatics::PlaySoundAtLocation(GetWorld(), ComboThreeSound, this->GetActorLocation());
+		break;
+	default:
+		return;
+	}
 }

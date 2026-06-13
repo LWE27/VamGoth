@@ -60,14 +60,20 @@ public:
 	bool IsAttacking;
 	bool SaveAttack;
 	int32 AttackCount = 0;
-
-	// Attack Timer Variabels
 	FTimerHandle AttackIntervalTimerHandle;
+	bool CanAttack = true;
 
 	UPROPERTY(EditAnywhere, Category="Combat")
 	float AttackInterval = 0.5f;
 
-	bool CanAttack = true;
+	UPROPERTY(EditAnywhere, Category="Combat")
+	USoundBase* ComboOneSound;
+
+	UPROPERTY(EditAnywhere, Category="Combat")
+	USoundBase* ComboTwoSound;
+
+	UPROPERTY(EditAnywhere, Category="Combat")
+	USoundBase* ComboThreeSound;
 
 	// Combat Animations
 	UPROPERTY(EditAnywhere, Category="Combat")
@@ -97,15 +103,7 @@ public:
 	/** Handles look inputs from either controls or UI interfaces */
 	UFUNCTION(BlueprintCallable, Category="Input")
 	virtual void DoLook(float Yaw, float Pitch);
-
-	/** Handles jump pressed inputs from either controls or UI interfaces */
-	UFUNCTION(BlueprintCallable, Category="Input")
-	virtual void DoJumpStart();
-
-	/** Handles jump pressed inputs from either controls or UI interfaces */
-	UFUNCTION(BlueprintCallable, Category="Input")
-	virtual void DoJumpEnd();
-
+	
 	// Handles Attack Input Action
 	UFUNCTION(BlueprintCallable, Category="Input")
 	virtual void DoAttack();
@@ -115,6 +113,9 @@ public:
 
 	// Resets CanAttack to let the player hit again (connected to AttackInterval timer)
 	void ResetAttackInterval();
+
+	// Plays Sound depending on combo stage of the player
+	void PlayComboSound();
 
 	/** Returns CameraBoom subobject **/
 	FORCEINLINE class USpringArmComponent* GetCameraBoom() const { return CameraBoom; }
