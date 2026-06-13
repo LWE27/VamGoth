@@ -85,6 +85,8 @@ public:
 	UPROPERTY(EditAnywhere, Category="Combat")
 	UAnimMontage* AttackComboThree;
 
+	USkeletalMeshComponent* SkeletalMesh;
+
 protected:
 	/** Initialize input action bindings */
 	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
@@ -103,7 +105,7 @@ public:
 	/** Handles look inputs from either controls or UI interfaces */
 	UFUNCTION(BlueprintCallable, Category="Input")
 	virtual void DoLook(float Yaw, float Pitch);
-	
+
 	// Handles Attack Input Action
 	UFUNCTION(BlueprintCallable, Category="Input")
 	virtual void DoAttack();

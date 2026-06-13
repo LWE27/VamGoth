@@ -15,6 +15,9 @@ AVamGothCharacter::AVamGothCharacter()
 {
 	GetCapsuleComponent()->InitCapsuleSize(42.f, 96.f);
 
+	SkeletalMesh = CreateDefaultSubobject<USkeletalMeshComponent>(TEXT("SkeletalMesh"));
+	SkeletalMesh->SetupAttachment(GetCapsuleComponent());
+
 	bUseControllerRotationPitch = false;
 	bUseControllerRotationYaw = false;
 	bUseControllerRotationRoll = false;
